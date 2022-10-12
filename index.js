@@ -8,8 +8,12 @@ class Queue {
   }
 
   next = () => {
+    if (this.isStop) {
+      this.isRunning = false;
+    }
     if (this.index >= this.list.length - 1) {
       this.isRunning = false;
+      console.log('clear');
       this.clear();
       return;
     }
@@ -46,23 +50,34 @@ class Queue {
 
   parallelRun() {
     this.isParallel = true;
-    console.log(this.list);
-    for (const fn of this.list) {
+    const fn = this.del();
+    if (fn) {
       fn(this.next);
-      // fn().then(() => next());
     }
+    this.isParallel = false;
   }
 
   stop() {
+    console.log('stop', this.isParallel, !this.isRunning);
+    if (this.isParallel || !this.isRunning) {
+      return;
+    }
     this.isStop = true;
   }
 
   retry() {
+    if (this.isParallel || this.isRunning) {
+      return;
+    }
     this.isStop = false;
     this.run();
   }
 
   goOn() {
+    console.log('goOn', this.isParallel, this.isRunning);
+    if (this.isParallel || this.isRunning) {
+      return;
+    }
     this.isStop = false;
     this.next();
   }
@@ -73,7 +88,7 @@ class A extends Queue {
     super();
   }
 
-  async = (x) => {
+  quoteFN = (x) => {
     return async (next) => {
       await this.reorder(x);
       next();
@@ -90,7 +105,7 @@ class A extends Queue {
   }
 
   addQueueAndRun(x) {
-    this.add(this.async(x));
+    this.add(this.quoteFN(x));
     if (this.list.length && this.isRunning) {
       return;
     }
@@ -104,6 +119,18 @@ const a = new A();
 a.addQueueAndRun(2);
 a.addQueueAndRun(3);
 a.addQueueAndRun(4);
+a.addQueueAndRun(5);
+a.addQueueAndRun(6);
+
+a.stop();
+
+setTimeout(() => {
+  a.stop();
+}, 3000);
+
+setTimeout(() => {
+  a.goOn();
+}, 5000);
 
 // const async = (x) => {
 //   return (next) => {
