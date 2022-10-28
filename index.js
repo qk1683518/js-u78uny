@@ -109,28 +109,169 @@ class A extends Queue {
     if (this.list.length && this.isRunning) {
       return;
     }
-    // this.parallelRun();
-    this.run();
+    this.parallelRun();
+    // this.run();
     console.log('11', this.list.length, this.isRunning);
   }
 }
 
 const a = new A();
-a.addQueueAndRun(2);
-a.addQueueAndRun(3);
-a.addQueueAndRun(4);
-a.addQueueAndRun(5);
-a.addQueueAndRun(6);
+// a.addQueueAndRun(2);
+// a.addQueueAndRun(3);
+// a.addQueueAndRun(4);
+// a.addQueueAndRun(5);
+// a.addQueueAndRun(6);
+// a.addQueueAndRun([2, 3, 4, 5, 6, 7]);
 
-a.stop();
+// a.stop();
 
-setTimeout(() => {
-  a.stop();
-}, 3000);
+// setTimeout(() => {
+//   a.stop();
+// }, 3000);
 
-setTimeout(() => {
-  a.goOn();
-}, 5000);
+// setTimeout(() => {
+//   a.goOn();
+// }, 5000);
+
+class Queue1 {
+  constructor(request, maxNum = 1) {
+    // this.list = [];
+    // this.index = 0;
+    this.maxNum = maxNum; // 最大并行数
+    this.panddingList = [];
+    this.request = request;
+    // this.isStop = false;
+    // this.isRunning = false;
+    // this.isParallel = false;
+  }
+
+  add(...fn) {
+    console.log(...fn);
+    this.list.push(...fn);
+  }
+
+  del() {
+    return this.list.shift();
+  }
+
+  clear() {
+    this.index = 0;
+    this.list.length = 0;
+  }
+
+  async runTask(list) {
+    let paddingResolve;
+    const paddingPromise = new Promise((r) => (paddingResolve = r));
+    this.panddingList.push(paddingPromise);
+
+    if (this.panddingList.length - 1 > 0) {
+      console.log(this.panddingList.length, this.panddingList, 'xx');
+      await this.panddingList[this.panddingList.length - 2];
+    }
+    let resolve;
+    const promise = new Promise((r) => (resolve = r));
+    // this.panddingList.push(promise);
+
+    let i = 0;
+    const ret = [];
+    let maxNum = this.maxNum;
+    if (maxNum > list.length) {
+      maxNum = list.length;
+    }
+
+    const run = () => {
+      if (i >= list.length) {
+        return resolve();
+      }
+
+      const task = this.request(list[i++]).finally(() => {
+        run();
+      });
+      ret.push(task);
+    };
+
+    while (i < maxNum) {
+      run();
+    }
+
+    const finish = promise.then(() => Promise.all(ret));
+    finish.finally(() => {
+      console.log('finish', list);
+      paddingResolve();
+      this.panddingList.shift();
+    });
+
+    return finish;
+  }
+}
+
+// end
+class B extends Queue1 {
+  constructor() {
+    super(request, 4);
+  }
+
+  reorder(url) {
+    return new Promise((r) => {
+      const time = Math.random() * 1000;
+      setTimeout(() => {
+        r(url);
+        console.log(url, 'reorder');
+      }, time);
+    });
+  }
+
+  binchReorder(parlist) {
+    this.runTask(parlist).then((r) => {
+      console.log(r);
+    });
+  }
+}
+
+const b = new B();
+b.binchReorder([1, 2, 3, 4]);
+b.binchReorder([5, 6, 7, 8]);
+b.binchReorder([9, 10, 11, 12]);
+b.binchReorder([13, 14, 15, 16]);
+
+// 方法版
+function multiRequest(urls, maxNum) {
+  const ret = [];
+  let i = 0;
+  let resolve;
+  const promise = new Promise((r) => (resolve = r));
+  const addTask = () => {
+    if (i >= urls.length) {
+      return resolve();
+    }
+
+    const task = request(urls[i++]).finally(() => {
+      addTask();
+    });
+    ret.push(task);
+  };
+
+  while (i < maxNum) {
+    addTask();
+  }
+
+  return promise.then(() => Promise.all(ret));
+}
+
+// 模拟请求
+function request(url) {
+  return new Promise((r) => {
+    const time = Math.random() * 1000;
+    setTimeout(() => {
+      r(url, '22');
+      console.log(url);
+    }, 500);
+  });
+}
+
+// multiRequest([1, 2, 3, 4], 1).then((r) => {
+//   console.log(r, '2');
+// });
 
 // const async = (x) => {
 //   return (next) => {
