@@ -134,24 +134,17 @@ const a = new A();
 // }, 5000);
 
 class Queue1 {
-  constructor(request, maxNum = 1) {
-    // this.list = [];
-    // this.index = 0;
+  constructor(maxNum = 1) {
     this.maxNum = maxNum; // 最大并行数
     this.panddingList = [];
-    this.request = request;
-    // this.isStop = false;
-    // this.isRunning = false;
-    // this.isParallel = false;
   }
 
-  add(...fn) {
-    console.log(...fn);
-    this.list.push(...fn);
+  add(promise) {
+    this.panddingList.push(promise);
   }
 
   del() {
-    return this.list.shift();
+    return this.panddingList.shift();
   }
 
   clear() {
@@ -159,10 +152,10 @@ class Queue1 {
     this.list.length = 0;
   }
 
-  async runTask(list) {
+  async runTask(list, asyncFunc) {
     let paddingResolve;
     const paddingPromise = new Promise((r) => (paddingResolve = r));
-    this.panddingList.push(paddingPromise);
+    this.add(paddingPromise);
 
     if (this.panddingList.length - 1 > 0) {
       console.log(this.panddingList.length, this.panddingList, 'xx');
@@ -174,6 +167,7 @@ class Queue1 {
 
     let i = 0;
     const ret = [];
+    const err = [];
     let maxNum = this.maxNum;
     if (maxNum > list.length) {
       maxNum = list.length;
@@ -184,9 +178,11 @@ class Queue1 {
         return resolve();
       }
 
-      const task = this.request(list[i++]).finally(() => {
-        run();
-      });
+      const task = asyncFunc(...list[i++])
+        .catch((e) => err.push(e))
+        .finally(() => {
+          run();
+        });
       ret.push(task);
     };
 
@@ -194,11 +190,17 @@ class Queue1 {
       run();
     }
 
-    const finish = promise.then(() => Promise.all(ret));
-    finish.finally(() => {
-      console.log('finish', list);
+    const finish = promise.then(() =>
+      Promise.all(ret).finally((e) => {
+        if (err.length) {
+          throw err;
+        }
+      })
+    );
+    finish.finally((r) => {
+      console.log('finish', r, list);
       paddingResolve();
-      this.panddingList.shift();
+      this.del();
     });
 
     return finish;
@@ -208,31 +210,35 @@ class Queue1 {
 // end
 class B extends Queue1 {
   constructor() {
-    super(request, 4);
+    super(4);
   }
 
-  reorder(url) {
-    return new Promise((r) => {
-      const time = Math.random() * 1000;
+  reorder(url, url2) {
+    console.log(this);
+    return new Promise((r, j) => {
+      const time = Math.random() * 1000 || 0;
+      const time2 = Math.random() * 1000 || 0;
       setTimeout(() => {
-        r(url);
-        console.log(url, 'reorder');
+        if (time2 > time) {
+          console.log(url, '?');
+          r(url);
+        } else {
+          j('err' + url);
+        }
       }, time);
     });
   }
 
   binchReorder(parlist) {
-    this.runTask(parlist).then((r) => {
-      console.log(r);
-    });
+    return this.runTask(parlist, this.reorder.bind(this));
   }
 }
 
 const b = new B();
-b.binchReorder([1, 2, 3, 4]);
-b.binchReorder([5, 6, 7, 8]);
-b.binchReorder([9, 10, 11, 12]);
-b.binchReorder([13, 14, 15, 16]);
+b.binchReorder([[1, 2], [2], [3], [4]]).catch((r) => console.log(r));
+// b.binchReorder([5, 6, 7, 8]).catch((r) => console.log(r));
+// b.binchReorder([9, 10, 11, 12]).catch((r) => console.log(r));
+// b.binchReorder([13, 14, 15, 16]).catch((r) => console.log(r));
 
 // 方法版
 function multiRequest(urls, maxNum) {
@@ -260,12 +266,17 @@ function multiRequest(urls, maxNum) {
 
 // 模拟请求
 function request(url) {
-  return new Promise((r) => {
-    const time = Math.random() * 1000;
+  return new Promise((r, j) => {
+    const time = Math.random() * 1000 || 0;
+    const time2 = Math.random() * 1000 || 0;
     setTimeout(() => {
-      r(url, '22');
-      console.log(url);
-    }, 500);
+      if (time2 > time) {
+        console.log(url, '?');
+        r(url);
+      } else {
+        j('err' + url);
+      }
+    }, time);
   });
 }
 
